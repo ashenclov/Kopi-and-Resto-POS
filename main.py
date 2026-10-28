@@ -25,11 +25,6 @@ app = FastAPI(
 
 # Static files
 static_dir = Path(__file__).resolve().parent / "app" / "static"
-try:
-    static_dir.mkdir(parents=True, exist_ok=True)
-except OSError:
-    pass
-
 if static_dir.exists():
     app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
