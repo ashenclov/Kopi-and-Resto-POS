@@ -2,10 +2,18 @@ import os
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-DATA_DIR = BASE_DIR / "data"
-DATA_DIR.mkdir(exist_ok=True)
 
-DATABASE_URL = f"sqlite:///{DATA_DIR / 'resto_pos.db'}"
+# Di Vercel Serverless, filesystem bersifat read-only kecuali folder /tmp
+if os.environ.get("VERCEL"):
+    DATA_DIR = Path("/tmp")
+else:
+    DATA_DIR = BASE_DIR / "data"
+    try:
+        DATA_DIR.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        DATA_DIR = Path("/tmp")
+
+DATABASE_URL = os.environ.get("DATABASE_URL", f"sqlite:///{DATA_DIR / 'resto_pos.db'}")
 
 APP_NAME = "Kopi & Resto POS"
 APP_DESCRIPTION = "Sistem Kasir Modern Kafe & Restoran"
