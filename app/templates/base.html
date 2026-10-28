@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="id" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}{{ app_name }}{% endblock %}</title>
+    <!-- Tailwind CSS & DaisyUI via CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@4.7.2/dist/full.min.css" rel="stylesheet" type="text/css" />
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    
+    <style>
+        /* Print styles khusus Thermal Printer 58mm & 80mm */
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+            #thermal-receipt, #thermal-receipt * {
+                visibility: visible;
+            }
+            #thermal-receipt {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+                max-width: 58mm;
+                font-family: 'Courier New', Courier, monospace;
+                font-size: 11px;
+                color: #000;
+                background: #fff;
+                margin: 0;
+                padding: 4px;
+            }
+            .no-print {
+                display: none !important;
+            }
+        }
+    </style>
+    {% block head %}{% endblock %}
+</head>
+<body class="bg-slate-100 min-h-screen flex flex-col font-sans text-slate-800">
+    <!-- Navbar Top -->
+    <nav class="navbar bg-white border-b border-slate-200 px-4 sticky top-0 z-40 shadow-sm no-print">
+        <div class="navbar-start">
+            <div class="dropdown lg:hidden">
+                <div tabindex="0" role="button" class="btn btn-ghost btn-circle">
+                    <i class="fa-solid fa-bars text-lg"></i>
+                </div>
+                <ul tabindex="0" class="menu menu-sm dropdown-content mt-3 z-[1] p-2 shadow-lg bg-base-100 rounded-box w-52 border border-slate-200">
+                    <li><a href="/pos"><i class="fa-solid fa-cash-register w-5 text-emerald-600"></i> Kasir (POS)</a></li>
+                    <li><a href="/waiter"><i class="fa-solid fa-mobile-screen w-5 text-blue-600"></i> Order Waiter</a></li>
+                    <li><a href="/kitchen"><i class="fa-solid fa-kitchen-set w-5 text-amber-600"></i> Layar Dapur</a></li>
+                    <li><a href="/admin/menu"><i class="fa-solid fa-utensils w-5 text-purple-600"></i> Kelola Menu</a></li>
+                    <li><a href="/admin/reports"><i class="fa-solid fa-chart-line w-5 text-teal-600"></i> Laporan</a></li>
+                </ul>
+            </div>
+            <a href="/pos" class="flex items-center gap-2 font-bold text-lg text-emerald-700 tracking-tight">
+                <div class="w-8 h-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center shadow">
+                    <i class="fa-solid fa-mug-hot text-sm"></i>
+                </div>
+                <span>{{ app_name }}</span>
+            </a>
+        </div>
+
+        <div class="navbar-center hidden lg:flex">
+            <ul class="menu menu-horizontal px-1 gap-1 font-medium">
+                <li>
+                    <a href="/pos" class="hover:bg-emerald-50 hover:text-emerald-700 active:bg-emerald-600">
+                        <i class="fa-solid fa-cash-register text-emerald-600"></i> Layar Kasir
+                    </a>
+                </li>
+                <li>
+                    <a href="/waiter" class="hover:bg-blue-50 hover:text-blue-700">
+                        <i class="fa-solid fa-mobile-screen text-blue-600"></i> Order Pelayan (HP)
+                    </a>
+                </li>
+                <li>
+                    <a href="/kitchen" class="hover:bg-amber-50 hover:text-amber-700">
+                        <i class="fa-solid fa-kitchen-set text-amber-600"></i> Layar Dapur
+                    </a>
+                </li>
+                <li>
+                    <a href="/admin/menu" class="hover:bg-purple-50 hover:text-purple-700">
+                        <i class="fa-solid fa-utensils text-purple-600"></i> Menu
+                    </a>
+                </li>
+                <li>
+                    <a href="/admin/reports" class="hover:bg-teal-50 hover:text-teal-700">
+                        <i class="fa-solid fa-chart-line text-teal-600"></i> Laporan
+                    </a>
+                </li>
+            </ul>
+        </div>
+
+        <div class="navbar-end gap-2">
+            <div class="badge badge-success badge-outline gap-1 text-xs py-3 px-3">
+                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                Sistem Aktif
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="flex-1 p-3 md:p-6">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Modal Struk Cetak Universal (Thermal Printer Ready) -->
+    <div id="receipt-modal-wrapper" class="hidden">
+        <div id="thermal-receipt" class="p-3 bg-white text-black font-mono text-xs">
+            <div class="text-center pb-2 border-b border-dashed border-gray-400">
+                <h2 class="font-bold text-sm uppercase">{{ app_name }}</h2>
+                <p class="text-[10px]">Jl. Contoh No. 123, Indonesia</p>
+                <p class="text-[10px]" id="receipt-date"></p>
+                <p class="text-[10px]">No: <span id="receipt-no" class="font-bold"></span></p>
+                <p class="text-[10px]">Meja / Tipe: <span id="receipt-table" class="font-semibold"></span></p>
+            </div>
+            <div class="py-2 border-b border-dashed border-gray-400" id="receipt-items">
+                <!-- Rincian item diinjeksi via JavaScript -->
+            </div>
+            <div class="py-2 space-y-1 text-[11px] border-b border-dashed border-gray-400">
+                <div class="flex justify-between">
+                    <span>Subtotal:</span>
+                    <span id="receipt-subtotal">Rp 0</span>
+                </div>
+                <div class="flex justify-between" id="receipt-discount-row">
+                    <span>Diskon:</span>
+                    <span id="receipt-discount">- Rp 0</span>
+                </div>
+                <div class="flex justify-between" id="receipt-tax-row">
+                    <span>Pajak (PB1):</span>
+                    <span id="receipt-tax">Rp 0</span>
+                </div>
+                <div class="flex justify-between font-bold text-xs pt-1 border-t border-gray-300">
+                    <span>TOTAL:</span>
+                    <span id="receipt-total">Rp 0</span>
+                </div>
+                <div class="flex justify-between text-[10px] pt-1">
+                    <span>Bayar (<span id="receipt-method">Cash</span>):</span>
+                    <span id="receipt-paid">Rp 0</span>
+                </div>
+                <div class="flex justify-between text-[10px]">
+                    <span>Kembali:</span>
+                    <span id="receipt-change">Rp 0</span>
+                </div>
+            </div>
+            <div class="text-center pt-3 text-[10px]">
+                <p>Terima Kasih Atas Kunjungan Anda!</p>
+                <p>Silakan Datang Kembali</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Script Pembantu Format Rupiah & Universal Print -->
+    <script>
+        function formatRupiah(number) {
+            return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(number);
+        }
+
+        function printReceipt(paymentData, orderData) {
+            document.getElementById('receipt-date').innerText = paymentData.payment_time || new Date().toLocaleString('id-ID');
+            document.getElementById('receipt-no').innerText = paymentData.receipt_number || orderData.order_number;
+            document.getElementById('receipt-table').innerText = orderData.table_name || (orderData.order_type === 'dine_in' ? 'Dine In' : 'Take Away');
+            
+            let itemsHtml = '';
+            if (orderData.items) {
+                orderData.items.forEach(it => {
+                    itemsHtml += `
+                        <div class="flex justify-between text-[11px] my-1">
+                            <div>
+                                <div>${it.name}</div>
+                                <div class="text-[9px] text-gray-500">${it.quantity}x @ ${formatRupiah(it.unit_price)}</div>
+                            </div>
+                            <div class="text-right">${formatRupiah(it.subtotal)}</div>
+                        </div>
+                    `;
+                });
+            }
+            document.getElementById('receipt-items').innerHTML = itemsHtml;
+            document.getElementById('receipt-subtotal').innerText = formatRupiah(paymentData.subtotal);
+            document.getElementById('receipt-discount').innerText = "- " + formatRupiah(paymentData.discount);
+            document.getElementById('receipt-tax').innerText = formatRupiah(paymentData.tax);
+            document.getElementById('receipt-total').innerText = formatRupiah(paymentData.final_amount);
+            document.getElementById('receipt-method').innerText = (paymentData.payment_method || 'Tunai').toUpperCase();
+            document.getElementById('receipt-paid').innerText = formatRupiah(paymentData.pay_amount);
+            document.getElementById('receipt-change').innerText = formatRupiah(paymentData.change_amount);
+
+            // Buka dialog print browser
+            window.print();
+        }
+    </script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

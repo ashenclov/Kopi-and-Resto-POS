@@ -1,0 +1,279 @@
+{% extends "base.html" %}
+
+{% block title %}Order Pelayan - {{ app_name }}{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto pb-24">
+    <!-- Header Input Info Order -->
+    <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 mb-4">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div>
+                <label class="label text-xs font-bold text-slate-700 py-1">Tipe Pesanan</label>
+                <select id="order-type-select" onchange="toggleTableSelect()" class="select select-sm select-bordered w-full font-medium">
+                    <option value="dine_in">Makan di Tempat (Dine In)</option>
+                    <option value="takeaway">Bungkus (Take Away)</option>
+                </select>
+            </div>
+            <div id="table-select-wrapper">
+                <label class="label text-xs font-bold text-slate-700 py-1">Pilih Nomor Meja</label>
+                <select id="table-id-select" class="select select-sm select-bordered w-full font-medium">
+                    <option value="">-- Pilih Meja --</option>
+                    {% for table in tables %}
+                    <option value="{{ table.id }}" {% if table.status == 'occupied' %}class="text-rose-600 font-bold"{% endif %}>
+                        {{ table.table_number }} {% if table.status == 'occupied' %}(Terisi){% else %}(Kosong){% endif %}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="label text-xs font-bold text-slate-700 py-1">Nama Tamu / Pelanggan</label>
+                <input type="text" id="customer-name-input" placeholder="Contoh: Bpk. Budi"
+                       class="input input-sm input-bordered w-full font-medium">
+            </div>
+        </div>
+    </div>
+
+    <!-- Filter Kategori Menu Horisontal -->
+    <div class="flex overflow-x-auto gap-2 py-1 mb-4 no-scrollbar">
+        <button onclick="filterCategory('all')" id="cat-btn-all"
+                class="category-tab btn btn-sm btn-primary rounded-full px-4 text-xs font-semibold whitespace-nowrap">
+            Semua Menu
+        </button>
+        {% for cat in categories %}
+        <button onclick="filterCategory('{{ cat.id }}')" id="cat-btn-{{ cat.id }}"
+                class="category-tab btn btn-sm btn-outline rounded-full px-4 text-xs font-semibold whitespace-nowrap">
+            {{ cat.name }}
+        </button>
+        {% endfor %}
+    </div>
+
+    <!-- Grid Menu Makanan & Minuman -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4" id="menus-grid">
+        {% for menu in menus %}
+        <div class="menu-card bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col justify-between hover:border-emerald-400 transition"
+             data-category="{{ menu.category_id }}" data-name="{{ menu.name.lower() }}">
+            <div class="p-4">
+                <div class="flex justify-between items-start gap-2">
+                    <h3 class="font-bold text-slate-800 text-sm leading-snug">{{ menu.name }}</h3>
+                    <span class="badge badge-ghost badge-sm text-[10px]">{{ menu.category.name }}</span>
+                </div>
+                <p class="text-xs text-slate-500 mt-1 line-clamp-2">{{ menu.description }}</p>
+            </div>
+            <div class="p-4 pt-0 flex items-center justify-between border-t border-slate-100 mt-2">
+                <span class="font-extrabold text-emerald-700 text-sm">
+                    Rp {{ "{:,.0f}".format(menu.price) }}
+                </span>
+                <button onclick="addToCart('{{ menu.id }}', '{{ menu.name }}', {{ menu.price }})"
+                        class="btn btn-sm btn-circle btn-primary text-white shadow-sm" title="Tambah ke keranjang">
+                    <i class="fa-solid fa-plus text-xs"></i>
+                </button>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- Floating Bottom Bar Keranjang (Mobile & Desktop) -->
+<div class="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 p-3 shadow-2xl z-30">
+    <div class="max-w-6xl mx-auto flex items-center justify-between gap-4">
+        <div>
+            <div class="text-xs text-slate-500 font-medium">Total Pesanan:</div>
+            <div class="text-lg font-black text-emerald-700" id="cart-total-bar">Rp 0</div>
+        </div>
+        <div class="flex items-center gap-2">
+            <button onclick="document.getElementById('cart_modal').showModal()"
+                    class="btn btn-primary text-white text-sm font-bold shadow-md px-5 flex items-center gap-2">
+                <i class="fa-solid fa-cart-shopping"></i>
+                <span>Lihat Keranjang</span>
+                <span class="badge badge-sm badge-neutral" id="cart-count-badge">0</span>
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Drawer Keranjang Pesanan -->
+<dialog id="cart_modal" class="modal">
+    <div class="modal-box max-w-lg">
+        <h3 class="font-bold text-lg text-slate-800 flex items-center gap-2">
+            <i class="fa-solid fa-clipboard-list text-emerald-600"></i> Keranjang Pesanan
+        </h3>
+        <p class="text-xs text-slate-500 mb-3">Tinjau item dan beri catatan khusus (misal: "Pedas", "Less sugar")</p>
+
+        <!-- Daftar Item Keranjang -->
+        <div class="max-h-80 overflow-y-auto space-y-2.5 py-1" id="cart-items-container">
+            <p class="text-xs text-slate-400 text-center py-6">Keranjang masih kosong.</p>
+        </div>
+
+        <div class="border-t border-slate-200 pt-3 mt-3 flex justify-between items-center">
+            <span class="text-sm font-bold text-slate-700">Subtotal:</span>
+            <span class="text-lg font-black text-emerald-800" id="cart-subtotal-modal">Rp 0</span>
+        </div>
+
+        <div class="modal-action">
+            <form method="dialog">
+                <button class="btn btn-sm btn-ghost">Tutup</button>
+            </form>
+            <button onclick="submitOrder()" id="btn-submit-order" class="btn btn-sm btn-success text-white font-bold px-6">
+                <i class="fa-solid fa-paper-plane"></i> Kirim Pesanan
+            </button>
+        </div>
+    </div>
+</dialog>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let cart = []; // [{menu_id, name, price, quantity, notes}]
+
+    function toggleTableSelect() {
+        const type = document.getElementById('order-type-select').value;
+        const wrapper = document.getElementById('table-select-wrapper');
+        if (type === 'takeaway') {
+            wrapper.classList.add('hidden');
+        } else {
+            wrapper.classList.remove('hidden');
+        }
+    }
+
+    function filterCategory(catId) {
+        document.querySelectorAll('.category-tab').forEach(b => {
+            b.className = 'category-tab btn btn-sm btn-outline rounded-full px-4 text-xs font-semibold whitespace-nowrap';
+        });
+        const activeBtn = document.getElementById(`cat-btn-${catId}`);
+        if (activeBtn) {
+            activeBtn.className = 'category-tab btn btn-sm btn-primary rounded-full px-4 text-xs font-semibold whitespace-nowrap';
+        }
+
+        document.querySelectorAll('.menu-card').forEach(card => {
+            if (catId === 'all' || card.getAttribute('data-category') === catId) {
+                card.classList.remove('hidden');
+            } else {
+                card.classList.add('hidden');
+            }
+        });
+    }
+
+    function addToCart(menuId, name, price) {
+        const existing = cart.find(it => it.menu_id == menuId);
+        if (existing) {
+            existing.quantity += 1;
+        } else {
+            cart.push({
+                menu_id: parseInt(menuId),
+                name: name,
+                price: price,
+                quantity: 1,
+                notes: ''
+            });
+        }
+        renderCart();
+    }
+
+    function changeQuantity(menuId, delta) {
+        const item = cart.find(it => it.menu_id == menuId);
+        if (item) {
+            item.quantity += delta;
+            if (item.quantity <= 0) {
+                cart = cart.filter(it => it.menu_id != menuId);
+            }
+        }
+        renderCart();
+    }
+
+    function updateNotes(menuId, notes) {
+        const item = cart.find(it => it.menu_id == menuId);
+        if (item) {
+            item.notes = notes;
+        }
+    }
+
+    function renderCart() {
+        let total = 0;
+        let count = 0;
+        let html = '';
+
+        if (cart.length === 0) {
+            html = '<p class="text-xs text-slate-400 text-center py-6">Keranjang masih kosong.</p>';
+            document.getElementById('btn-submit-order').disabled = true;
+        } else {
+            document.getElementById('btn-submit-order').disabled = false;
+            cart.forEach(it => {
+                const itemTotal = it.price * it.quantity;
+                total += itemTotal;
+                count += it.quantity;
+
+                html += `
+                    <div class="p-3 rounded-lg border border-slate-200 bg-slate-50 space-y-2">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <div class="font-bold text-xs text-slate-800">${it.name}</div>
+                                <div class="text-[11px] text-emerald-700 font-semibold">${formatRupiah(it.price)}</div>
+                            </div>
+                            <!-- Quantity Controls -->
+                            <div class="flex items-center gap-2">
+                                <button onclick="changeQuantity(${it.menu_id}, -1)" class="btn btn-xs btn-circle btn-outline border-slate-300">
+                                    <i class="fa-solid fa-minus text-[10px]"></i>
+                                </button>
+                                <span class="font-bold text-xs w-5 text-center">${it.quantity}</span>
+                                <button onclick="changeQuantity(${it.menu_id}, 1)" class="btn btn-xs btn-circle btn-outline border-slate-300">
+                                    <i class="fa-solid fa-plus text-[10px]"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <!-- Catatan Khusus Item -->
+                        <div>
+                            <input type="text" placeholder="Catatan (opsional): Less sugar, pedas..." 
+                                   value="${it.notes}" oninput="updateNotes(${it.menu_id}, this.value)"
+                                   class="input input-xs input-bordered w-full bg-white text-[11px]">
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        document.getElementById('cart-items-container').innerHTML = html;
+        document.getElementById('cart-total-bar').innerText = formatRupiah(total);
+        document.getElementById('cart-subtotal-modal').innerText = formatRupiah(total);
+        document.getElementById('cart-count-badge').innerText = count;
+    }
+
+    async function submitOrder() {
+        const orderType = document.getElementById('order-type-select').value;
+        const tableId = document.getElementById('table-id-select').value;
+        const customerName = document.getElementById('customer-name-input').value.trim();
+
+        if (orderType === 'dine_in' && !tableId) {
+            alert("Harap pilih nomor meja terlebih dahulu!");
+            return;
+        }
+
+        if (cart.length === 0) {
+            alert("Keranjang pesanan masih kosong!");
+            return;
+        }
+
+        try {
+            const res = await fetch('/api/orders', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    order_type: orderType,
+                    table_id: tableId ? parseInt(tableId) : null,
+                    customer_name: customerName || 'Tamu',
+                    items: cart
+                })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.detail || 'Gagal mengirim pesanan');
+
+            alert(`Pesanan ${data.order_number} berhasil dikirim ke kasir & dapur!`);
+            cart = [];
+            renderCart();
+            document.getElementById('cart_modal').close();
+            window.location.href = '/pos';
+        } catch (e) {
+            alert("Error: " + e.message);
+        }
+    }
+</script>
+{% endblock %}

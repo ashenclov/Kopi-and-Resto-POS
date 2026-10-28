@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+
+{% block title %}Layar Dapur (Kitchen Display) - {{ app_name }}{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto space-y-4">
+    <!-- Header Layar Dapur -->
+    <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-wrap items-center justify-between gap-3">
+        <div>
+            <h1 class="text-xl font-bold text-slate-800 flex items-center gap-2">
+                <i class="fa-solid fa-fire-burner text-amber-600"></i> Layar Dapur & Bar (KDS)
+            </h1>
+            <p class="text-xs text-slate-500">Daftar pesanan masuk yang perlu disiapkan oleh tim dapur</p>
+        </div>
+        <div class="flex items-center gap-3">
+            <span class="text-xs text-slate-400 flex items-center gap-1">
+                <i class="fa-solid fa-arrows-rotate animate-spin text-emerald-500"></i> Auto-refresh (10s)
+            </span>
+            <button onclick="loadKitchenOrders()" class="btn btn-sm btn-ghost border-slate-200">
+                <i class="fa-solid fa-rotate"></i> Refresh Manual
+            </button>
+        </div>
+    </div>
+
+    <!-- Container Tiket Pesanan Dapur -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4" id="kitchen-tickets-grid">
+        <div class="col-span-full py-16 text-center text-slate-400 space-y-2">
+            <i class="fa-solid fa-spinner animate-spin text-2xl text-amber-500"></i>
+            <p class="text-sm">Memuat pesanan dapur...</p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    async function loadKitchenOrders() {
+        try {
+            const res = await fetch('/api/kitchen/orders');
+            const data = await res.json();
+            const container = document.getElementById('kitchen-tickets-grid');
+
+            if (!data || data.length === 0) {
+                container.innerHTML = `
+                    <div class="col-span-full py-20 text-center text-slate-400 space-y-2">
+                        <i class="fa-solid fa-circle-check text-4xl text-emerald-400"></i>
+                        <p class="text-base font-semibold text-slate-600">Semua Pesanan Selesai!</p>
+                        <p class="text-xs text-slate-400">Belum ada pesanan baru yang masuk ke dapur.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            let html = '';
+            data.forEach(ticket => {
+                const isDineIn = ticket.order_type === 'dine_in';
+                html += `
+                    <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col justify-between">
+                        <!-- Header Tiket -->
+                        <div class="p-3 border-b border-slate-200 ${isDineIn ? 'bg-amber-50/70 border-amber-200' : 'bg-blue-50/70 border-blue-200'}">
+                            <div class="flex justify-between items-center">
+                                <span class="font-extrabold text-sm ${isDineIn ? 'text-amber-900' : 'text-blue-900'}">
+                                    ${ticket.table_name}
+                                </span>
+                                <span class="badge badge-sm badge-neutral text-[10px] font-mono">${ticket.created_time}</span>
+                            </div>
+                            <div class="flex justify-between items-center text-xs text-slate-600 mt-1">
+                                <span><i class="fa-regular fa-user text-[10px]"></i> ${ticket.customer_name}</span>
+                                <span class="text-[10px] font-mono text-slate-400">${ticket.order_number}</span>
+                            </div>
+                        </div>
+
+                        <!-- Item Pesanan -->
+                        <div class="p-3 space-y-3 flex-1 overflow-y-auto">
+                            ${ticket.items.map(item => `
+                                <div class="p-2 rounded-lg border border-slate-100 bg-slate-50 flex items-start justify-between gap-2">
+                                    <div>
+                                        <div class="font-bold text-xs text-slate-800">
+                                            <span class="inline-block w-5 h-5 text-center leading-5 rounded bg-slate-200 text-slate-700 text-[11px] mr-1">
+                                                ${item.quantity}x
+                                            </span>
+                                            ${item.name}
+                                        </div>
+                                        ${item.notes ? `
+                                            <div class="text-[11px] font-semibold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded mt-1 inline-block border border-amber-200">
+                                                <i class="fa-solid fa-bell text-[9px]"></i> ${item.notes}
+                                            </div>
+                                        ` : ''}
+                                    </div>
+                                    <!-- Status Button -->
+                                    <div>
+                                        ${item.status === 'pending' ? `
+                                            <button onclick="updateStatus(${item.id}, 'cooking')"
+                                                    class="btn btn-xs btn-outline btn-warning text-[10px] font-bold">
+                                                Masak
+                                            </button>
+                                        ` : `
+                                            <button onclick="updateStatus(${item.id}, 'served')"
+                                                    class="btn btn-xs btn-success text-white text-[10px] font-bold">
+                                                Selesai
+                                            </button>
+                                        `}
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            });
+            container.innerHTML = html;
+        } catch (e) {
+            console.error("Gagal load order dapur:", e);
+        }
+    }
+
+    async function updateStatus(itemId, newStatus) {
+        try {
+            const res = await fetch(`/api/kitchen/items/${itemId}/status`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: newStatus })
+            });
+            if (res.ok) {
+                loadKitchenOrders();
+            }
+        } catch (e) {
+            alert("Gagal update status item: " + e.message);
+        }
+    }
+
+    // Auto load saat buka halaman & refresh setiap 10 detik
+    loadKitchenOrders();
+    setInterval(loadKitchenOrders, 10000);
+</script>
+{% endblock %}
